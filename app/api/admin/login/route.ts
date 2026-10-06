@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { adminCookie, clearAdminCookie, signAdminSession } from "@/lib/session";
+import { adminCookie, applyCookie, clearAdminCookie, signAdminSession } from "@/lib/session";
 import { rateLimit } from "@/lib/rate-limit";
 import { appUrl } from "@/lib/config";
 
@@ -20,12 +20,12 @@ export async function POST(request: Request) {
   }
   const token = await signAdminSession();
   const res = NextResponse.json({ ok: true });
-  res.cookies.set(adminCookie(token));
+  applyCookie(res, adminCookie(token));
   return res;
 }
 
 export async function DELETE() {
   const res = NextResponse.redirect(`${appUrl()}/admin`);
-  res.cookies.set(clearAdminCookie());
+  applyCookie(res, clearAdminCookie());
   return res;
 }

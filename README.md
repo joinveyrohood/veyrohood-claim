@@ -32,8 +32,8 @@ Create a new Supabase project. In the SQL editor, run `supabase/schema.sql`.
 Copy:
 
 - Project URL → `NEXT_PUBLIC_SUPABASE_URL`
-- anon key → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- service role key → `SUPABASE_SERVICE_ROLE_KEY` (server only)
+- anon / publishable key → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- secret key → `SUPABASE_SECRET_KEY` (preferred) or `SUPABASE_SERVICE_ROLE_KEY` (still accepted). Server only. Never expose this to the browser.
 
 Row Level Security is enabled with no public policies. The app writes through the service role on the server.
 

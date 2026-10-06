@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { xAuthorizeUrl } from "@/lib/x";
-import { oauthCookie } from "@/lib/session";
+import { applyCookie, encodeOauthPayload, oauthCookie } from "@/lib/session";
 import { rateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
@@ -27,7 +27,32 @@ export async function GET(request: Request) {
   const state = randomBase64Url(16);
   const verifier = randomBase64Url(48);
   const codeChallenge = await challenge(verifier);
-  const res = NextResponse.redirect(xAuthorizeUrl(state, codeChallenge));
-  res.cookies.set(oauthCookie(JSON.stringify({ state, verifier })));
+  const authorizeUrl = xAuthorizeUrl(state, codeChallenge);
+  const payload = encodeOauthPayload({ state, verifier, exp: Date.now() + 10 * 60 * 1000 });
+
+  // 200 + Set-Cookie, then a same-origin script hop. A 307 straight to X drops
+  // the PKCE cookie in Chrome because that Set-Cookie rides a cross-site redirect.
+  const html = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="referrer" content="no-referrer">
+  <title>Continue to X</title>
+</head>
+<body>
+  <p>Redirecting to X…</p>
+  <script>location.replace(${JSON.stringify(authorizeUrl)});</script>
+</body>
+</html>`;
+
+  const res = new NextResponse(html, {
+    status: 200,
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "no-store, max-age=0",
+      "Referrer-Policy": "no-referrer"
+    }
+  });
+  applyCookie(res, oauthCookie(payload));
   return res;
 }

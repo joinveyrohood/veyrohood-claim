@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { exchangeXCode, fetchXMe, xRedirectUri } from "@/lib/x";
-import { clearOauthCookie, readOauthCookie, sessionCookie, signUserSession } from "@/lib/session";
+import { applyCookie, clearOauthCookie, decodeOauthPayload, readOauthCookie, sessionCookie, signUserSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase";
 import { appUrl } from "@/lib/config";
 
@@ -11,14 +11,18 @@ export async function GET(request: Request) {
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
   const oauthError = url.searchParams.get("error");
-  const fail = (message: string) => NextResponse.redirect(`${appUrl()}/login?error=${encodeURIComponent(message)}`);
+  const fail = (message: string) => {
+    const res = NextResponse.redirect(`${appUrl()}/login?error=${encodeURIComponent(message)}`);
+    applyCookie(res, clearOauthCookie());
+    return res;
+  };
 
   if (oauthError) return fail(oauthError);
   if (!code || !state) return fail("Missing OAuth code.");
 
-  const raw = readOauthCookie();
-  if (!raw) return fail("OAuth session expired. Try again.");
-  const saved = JSON.parse(raw) as { state: string; verifier: string };
+  const raw = readOauthCookie(request);
+  const saved = raw ? decodeOauthPayload(raw) : null;
+  if (!saved) return fail("OAuth session expired. Try again.");
   if (saved.state !== state) return fail("OAuth state mismatch.");
 
   try {
@@ -47,8 +51,8 @@ export async function GET(request: Request) {
 
     const session = await signUserSession({ sub: user.id, username: user.x_username });
     const res = NextResponse.redirect(`${appUrl()}/dashboard`);
-    res.cookies.set(sessionCookie(session));
-    res.cookies.set(clearOauthCookie());
+    applyCookie(res, sessionCookie(session));
+    applyCookie(res, clearOauthCookie());
     return res;
   } catch (error) {
     const message = error instanceof Error ? error.message : "X login failed.";
