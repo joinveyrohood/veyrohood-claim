@@ -1,0 +1,35 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  min-height: 100vh;
+  background:
+    radial-gradient(900px 420px at 10% -10%, rgba(61, 139, 255, 0.18), transparent 55%),
+    radial-gradient(700px 380px at 100% 0%, rgba(200, 245, 66, 0.12), transparent 50%),
+    #07080c;
+}
+
+.card {
+  @apply rounded-3xl border border-line bg-panel/90 shadow-glow backdrop-blur;
+}
+
+.btn {
+  @apply inline-flex items-center justify-center rounded-full px-5 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50;
+}
+
+.btn-lime {
+  @apply btn bg-lime text-ink hover:brightness-110;
+}
+
+.btn-ghost {
+  @apply btn border border-line bg-white/5 text-white hover:border-electric;
+}
+
+.input {
+  @apply w-full rounded-2xl border border-line bg-black/30 px-4 py-3 text-sm outline-none ring-electric focus:ring-2;
+}
