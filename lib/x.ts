@@ -143,7 +143,11 @@ export async function appBearerToken() {
   const id = process.env.X_CLIENT_ID || "";
   const secret = process.env.X_CLIENT_SECRET || "";
   if (!id || !secret) throw new Error("X app credentials are not configured.");
-  const body = new URLSearchParams({ grant_type: "client_credentials" });
+  const body = new URLSearchParams({
+    grant_type: "client_credentials",
+    client_id: id,
+    client_secret: secret
+  });
   const res = await fetch(TOKEN_URL, {
     method: "POST",
     headers: {
