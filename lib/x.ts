@@ -2,6 +2,7 @@ import { appUrl } from "./config";
 import { supabaseAdmin } from "./supabase";
 
 const TOKEN_URL = "https://api.x.com/2/oauth2/token";
+const APP_TOKEN_URL = "https://api.x.com/oauth2/token";
 const USER_URL = "https://api.x.com/2/users/me";
 
 export const X_SCOPES = ["tweet.read", "users.read", "follows.read", "like.read", "offline.access"] as const;
@@ -136,19 +137,8 @@ export async function xGet(path: string, accessToken: string): Promise<XResult> 
 
 let appTokenCache: { token: string; expires: number } | null = null;
 
-export async function appBearerToken() {
-  if (appTokenCache && appTokenCache.expires > Date.now() + 30_000) return appTokenCache.token;
-  const configured = process.env.X_BEARER_TOKEN || process.env.X_APP_BEARER_TOKEN;
-  if (configured) return configured;
-  const id = process.env.X_CLIENT_ID || "";
-  const secret = process.env.X_CLIENT_SECRET || "";
-  if (!id || !secret) throw new Error("X app credentials are not configured.");
-  const body = new URLSearchParams({
-    grant_type: "client_credentials",
-    client_id: id,
-    client_secret: secret
-  });
-  const res = await fetch(TOKEN_URL, {
+async function requestAppToken(url: string, body: URLSearchParams) {
+  const res = await fetch(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
@@ -158,15 +148,40 @@ export async function appBearerToken() {
     cache: "no-store"
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok || !data.access_token) {
+  return { res, data };
+}
+
+export async function appBearerToken() {
+  if (appTokenCache && appTokenCache.expires > Date.now() + 30_000) return appTokenCache.token;
+  const configured = process.env.X_BEARER_TOKEN || process.env.X_APP_BEARER_TOKEN;
+  if (configured) return configured;
+  const id = process.env.X_CLIENT_ID || "";
+  const secret = process.env.X_CLIENT_SECRET || "";
+  if (!id || !secret) throw new Error("X app credentials are not configured.");
+
+  const attempts = [
+    requestAppToken(TOKEN_URL, new URLSearchParams({
+      grant_type: "client_credentials",
+      client_id: id,
+      client_secret: secret,
+      client_type: "third_party_app"
+    })),
+    requestAppToken(APP_TOKEN_URL, new URLSearchParams({ grant_type: "client_credentials" }))
+  ];
+  const failures: string[] = [];
+  for (const pending of attempts) {
+    const { res, data } = await pending;
+    if (res.ok && data.access_token) {
+      appTokenCache = {
+        token: data.access_token as string,
+        expires: Date.now() + (Number(data.expires_in) || 7200) * 1000
+      };
+      return appTokenCache.token;
+    }
     const detail = data.error_description || data.detail || data.error || data.title || "Could not get an app bearer token.";
-    throw new Error(`X API ${res.status} app token: ${detail}`);
+    failures.push(`X API ${res.status} app token: ${detail}`);
   }
-  appTokenCache = {
-    token: data.access_token as string,
-    expires: Date.now() + (Number(data.expires_in) || 7200) * 1000
-  };
-  return appTokenCache.token;
+  throw new Error(failures.join(" | "));
 }
 
 export function userByUsernamePath(username: string) {
