@@ -17,3 +17,7 @@ body {
 .btn-lime { @apply btn bg-lime text-ink hover:brightness-110; }
 .btn-ghost { @apply btn border border-line bg-white/5 text-white hover:border-electric; }
 .input { @apply w-full rounded-2xl border border-line bg-black/30 px-4 py-3 text-sm outline-none ring-electric focus:ring-2; }
+
+@media (min-width: 768px) {
+  header + main { margin-left: 16rem !important; }
+}
