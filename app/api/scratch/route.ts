@@ -16,13 +16,14 @@ export async function GET() {
   const auth = await requireUser();
   if (auth.error) return auth.error;
   const db = supabaseAdmin();
-  const { data } = await db.from("scratch_rewards").select("amount, revealed, revealed_at, created_at").eq("user_id", auth.session!.sub).maybeSingle();
+  const { data } = await db.from("scratch_rewards").select("amount, revealed, revealed_at").eq("user_id", auth.session!.sub).maybeSingle();
+  const { data: credit } = await db.from("transactions").select("id").eq("user_id", auth.session!.sub).eq("type", "REWARD_CREDIT").maybeSingle();
   const progress = await missionProgress(auth.session!.sub);
   return NextResponse.json({
     unlocked: unlocked(progress),
     completed: progress.completed,
     total: progress.total,
-    reward: data ? { amount: data.revealed ? Number(data.amount) : null, revealed: data.revealed, revealed_at: data.revealed_at } : null
+    reward: data ? { amount: data.revealed ? Number(data.amount) : null, revealed: data.revealed, claimed: Boolean(credit) } : null
   });
 }
 
@@ -32,30 +33,34 @@ export async function POST(request: Request) {
   const limited = rateLimit(`scratch:${auth.session!.sub}`, 8, 60_000);
   if (!limited.ok) return jsonError("Too many scratch requests.", 429);
   const body = await request.json().catch(() => ({}));
-  const action = body.action === "reveal" ? "reveal" : "generate";
+  const action = body.action === "claim" ? "claim" : body.action === "reveal" ? "reveal" : "generate";
   const progress = await missionProgress(auth.session!.sub);
-  if (!unlocked(progress)) return jsonError("Complete the mission flow before scratching.", 403);
+  if (!unlocked(progress)) return jsonError("Complete all missions before scratching.", 403);
   const db = supabaseAdmin();
   const { data: existing } = await db.from("scratch_rewards").select("id, amount, revealed").eq("user_id", auth.session!.sub).maybeSingle();
 
   if (action === "generate") {
     if (existing) return NextResponse.json({ amount: existing.revealed ? Number(existing.amount) : null, revealed: existing.revealed, created: false });
     const amount = generateRewardAmount();
-    const { data, error } = await db.from("scratch_rewards").insert({ user_id: auth.session!.sub, amount, revealed: false }).select("amount, revealed").single();
-    if (error) {
-      const { data: again } = await db.from("scratch_rewards").select("amount, revealed").eq("user_id", auth.session!.sub).single();
-      if (!again) return jsonError(error.message, 500);
-      return NextResponse.json({ amount: again.revealed ? Number(again.amount) : null, revealed: again.revealed, created: false });
-    }
-    return NextResponse.json({ amount: null, revealed: data.revealed, created: true });
+    const { error } = await db.from("scratch_rewards").insert({ user_id: auth.session!.sub, amount, revealed: false });
+    if (error) return jsonError(error.message, 500);
+    return NextResponse.json({ amount: null, revealed: false, created: true });
   }
 
   if (!existing) return jsonError("Generate the scratch reward first.", 409);
-  if (existing.revealed) return NextResponse.json({ amount: Number(existing.amount), revealed: true });
-  const { data: updated, error } = await db.from("scratch_rewards").update({ revealed: true, revealed_at: new Date().toISOString() }).eq("id", existing.id).eq("revealed", false).select("id").maybeSingle();
-  if (error) return jsonError(error.message, 500);
-  if (!updated) return NextResponse.json({ amount: Number(existing.amount), revealed: true });
-  await db.from("transactions").insert({ user_id: auth.session!.sub, type: "REWARD_CREDIT", amount: existing.amount, status: "COMPLETED", reference_id: existing.id });
-  await creditReferral(auth.session!.sub, Number(existing.amount));
-  return NextResponse.json({ amount: Number(existing.amount), revealed: true });
+  if (action === "reveal") {
+    if (!existing.revealed) {
+      await db.from("scratch_rewards").update({ revealed: true, revealed_at: new Date().toISOString() }).eq("id", existing.id).eq("revealed", false);
+    }
+    return NextResponse.json({ amount: Number(existing.amount), revealed: true, claimed: false });
+  }
+
+  if (!existing.revealed) return jsonError("Scratch the card before claiming.", 409);
+  const { data: credit } = await db.from("transactions").select("id").eq("user_id", auth.session!.sub).eq("type", "REWARD_CREDIT").maybeSingle();
+  if (!credit) {
+    const { error } = await db.from("transactions").insert({ user_id: auth.session!.sub, type: "REWARD_CREDIT", amount: existing.amount, status: "COMPLETED", reference_id: existing.id });
+    if (error && !String(error.message).toLowerCase().includes("duplicate")) return jsonError(error.message, 500);
+    await creditReferral(auth.session!.sub, Number(existing.amount));
+  }
+  return NextResponse.json({ amount: Number(existing.amount), revealed: true, claimed: true });
 }
