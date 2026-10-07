@@ -12,7 +12,7 @@ export function appUrl() {
 }
 
 export function officialUsername() {
-  return process.env.X_OFFICIAL_USERNAME || "VeyroHood";
+  return (process.env.X_OFFICIAL_USERNAME || "VeyroHood").trim().replace(/^@/, "");
 }
 
 export function pinnedPostUrl() {
