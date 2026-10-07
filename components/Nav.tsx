@@ -2,11 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 
 const links = [
-  ["/dashboard", "Home"],
+  ["/dashboard", "Dashboard"],
   ["/missions", "Missions"],
-  ["/scratch", "Scratch"],
+  ["/scratch", "Scratch & Claim"],
+  ["/referral", "Referral"],
   ["/wallet", "Wallet"],
   ["/kyc", "KYC"],
   ["/withdraw", "Withdraw"],
@@ -15,31 +17,25 @@ const links = [
 
 export function Nav({ username }: { username?: string }) {
   const path = usePathname();
+  const [open, setOpen] = useState(false);
   return (
-    <header className="sticky top-0 z-20 border-b border-white/5 bg-ink/80 backdrop-blur">
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
-        <Link href="/dashboard" className="font-display text-lg font-extrabold tracking-tight">
-          Scratch<span className="text-lime">.</span>Claim
-        </Link>
-        <nav className="hidden gap-1 md:flex">
+    <>
+      <aside className={`fixed inset-y-0 left-0 z-30 w-64 border-r border-line bg-ink/95 p-4 backdrop-blur transition md:translate-x-0 ${open ? "translate-x-0" : "-translate-x-full"}`}>
+        <Link href="/dashboard" className="font-display text-xl font-extrabold">VeyroHood <span className="text-lime">Claim</span></Link>
+        <p className="mt-1 text-xs text-white/40">Scratch, claim, refer</p>
+        <nav className="mt-6 grid gap-1">
           {links.map(([href, label]) => (
-            <Link key={href} href={href} className={`rounded-full px-3 py-1.5 text-sm ${path === href ? "bg-lime text-ink" : "text-white/70 hover:text-white"}`}>
-              {label}
-            </Link>
+            <Link key={href} href={href} onClick={() => setOpen(false)} className={`rounded-2xl px-3 py-2 text-sm ${path === href ? "bg-lime text-ink" : "text-white/70 hover:bg-white/5"}`}>{label}</Link>
           ))}
+          <a href="/api/auth/logout" className="rounded-2xl px-3 py-2 text-sm text-white/70 hover:bg-white/5">Logout</a>
         </nav>
-        <div className="flex items-center gap-2 text-sm text-white/70">
-          {username ? <span>@{username}</span> : null}
-          <a href="/api/auth/logout" className="rounded-full border border-line px-3 py-1.5">Log out</a>
-        </div>
-      </div>
-      <div className="flex gap-2 overflow-x-auto px-4 pb-3 md:hidden">
-        {links.map(([href, label]) => (
-          <Link key={href} href={href} className={`shrink-0 rounded-full px-3 py-1 text-xs ${path === href ? "bg-lime text-ink" : "bg-white/5 text-white/70"}`}>
-            {label}
-          </Link>
-        ))}
-      </div>
-    </header>
+      </aside>
+      {open ? <button className="fixed inset-0 z-20 bg-black/50 md:hidden" onClick={() => setOpen(false)} aria-label="Close menu" /> : null}
+      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-white/5 bg-ink/80 px-4 py-3 backdrop-blur md:ml-64">
+        <button className="btn-ghost px-3 py-2 md:hidden" onClick={() => setOpen(true)}>Menu</button>
+        <p className="text-sm text-white/60">{username ? `@${username}` : "Claim desk"}</p>
+        <a href="/api/auth/logout" className="text-sm text-white/60">Logout</a>
+      </header>
+    </>
   );
 }

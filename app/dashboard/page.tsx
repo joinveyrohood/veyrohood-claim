@@ -5,79 +5,72 @@ import Link from "next/link";
 import { Nav } from "@/components/Nav";
 
 type Me = {
-  user: { x_username: string; display_name: string; avatar_url?: string; created_at: string; discord_user_id?: string | null };
+  user: { x_username: string; display_name: string; avatar_url?: string; discord_user_id?: string | null };
   progress: { completed: number; total: number };
   balance: { available: number; reward: number; revealed: boolean };
   kyc: { status: string };
   wallet?: { network: string; address: string } | null;
-  reward?: { amount: number; revealed: boolean } | null;
 };
+type Referral = { count: number; earned: number; available: number; withdrawn: number; link: string; code: string };
 
 export default function DashboardPage() {
   const [me, setMe] = useState<Me | null>(null);
-  const [error, setError] = useState("");
+  const [referral, setReferral] = useState<Referral | null>(null);
+  const [note, setNote] = useState("");
 
   useEffect(() => {
-    fetch("/api/auth/me")
-      .then(async (res) => {
-        if (res.status === 401) {
-          window.location.href = "/login";
-          return null;
-        }
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error);
-        return data;
-      })
-      .then((data) => data && setMe(data))
-      .catch((err) => setError(err.message));
+    fetch("/api/auth/me").then(async (res) => {
+      if (res.status === 401) {
+        window.location.href = "/login";
+        return;
+      }
+      setMe(await res.json());
+      const ref = await fetch("/api/referral");
+      if (ref.ok) setReferral(await ref.json());
+    }).catch((error) => setNote(error.message));
   }, []);
 
-  if (!me) {
-    return <main className="p-8 text-white/60">{error || "Loading account..."}</main>;
+  async function copy() {
+    if (!referral) return;
+    await navigator.clipboard.writeText(referral.link);
+    setNote("Referral link copied.");
   }
 
+  if (!me) return <main className="p-8 text-white/60">{note || "Loading account..."}</main>;
   const ready = me.progress.total > 0 && me.progress.completed >= me.progress.total;
   return (
     <>
       <Nav username={me.user.x_username} />
-      <main className="mx-auto max-w-6xl px-4 py-8">
-        <section className="card flex flex-col gap-4 p-6 md:flex-row md:items-center">
-          {me.user.avatar_url ? <img src={me.user.avatar_url} alt="" className="h-16 w-16 rounded-2xl" /> : null}
-          <div>
-            <h1 className="font-display text-3xl font-extrabold">{me.user.display_name}</h1>
-            <p className="text-white/60">@{me.user.x_username} · Account active{me.user.discord_user_id ? " · Discord connected" : ""}</p>
-          </div>
-          <div className="md:ml-auto">
-            <p className="text-sm text-white/50">Mission progress</p>
-            <p className="font-display text-4xl font-extrabold text-lime">{me.progress.completed}/{me.progress.total}</p>
-          </div>
-        </section>
-        <section className="mt-4 grid gap-4 md:grid-cols-3">
-          <div className="card p-5">
-            <p className="text-sm text-white/50">Available balance</p>
-            <p className="font-display text-3xl font-bold">${me.balance.available.toFixed(2)}</p>
-          </div>
-          <div className="card p-5">
-            <p className="text-sm text-white/50">KYC status</p>
-            <p className="font-display text-3xl font-bold">{me.kyc.status}</p>
-          </div>
-          <div className="card p-5">
-            <p className="text-sm text-white/50">Wallet</p>
-            <p className="truncate font-display text-xl font-bold">{me.wallet?.address || "Not added"}</p>
-          </div>
-        </section>
-        {ready ? (
-          <section className="card mt-4 p-6">
-            <h2 className="font-display text-3xl font-extrabold">Scratch Card Unlocked!</h2>
-            <p className="mt-2 text-white/70">Your reward is generated once on the server and stays the same if you refresh or log out.</p>
-            <Link href="/scratch" className="btn-lime mt-5">Scratch & Claim</Link>
+      <main className="px-4 py-6 md:ml-64">
+        <div className="mx-auto max-w-6xl">
+          <p className="text-sm text-white/50">Mission progress</p>
+          <h1 className="font-display text-4xl font-extrabold">{me.progress.completed}/{me.progress.total} Missions Completed</h1>
+          <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full bg-lime" style={{ width: `${me.progress.total ? (me.progress.completed / me.progress.total) * 100 : 0}%` }} /></div>
+          <section className="mt-6 grid gap-4 md:grid-cols-4">
+            <article className="card p-5"><p className="text-sm text-white/50">Account</p><p className="mt-2 font-display text-2xl font-bold">@{me.user.x_username}</p><p className="text-sm text-white/50">{me.user.discord_user_id ? "Discord connected" : "Discord not connected"}</p></article>
+            <article className="card p-5"><p className="text-sm text-white/50">Reward</p><p className="mt-2 font-display text-2xl font-bold">{me.balance.revealed ? `$${me.balance.reward.toFixed(2)}` : "Hidden"}</p></article>
+            <article className="card p-5"><p className="text-sm text-white/50">Referral earnings</p><p className="mt-2 font-display text-2xl font-bold">${referral?.earned.toFixed(2) || "0.00"}</p><p className="text-sm text-white/50">{referral?.count || 0} referred</p></article>
+            <article className="card p-5"><p className="text-sm text-white/50">Available balance</p><p className="mt-2 font-display text-2xl font-bold">${me.balance.available.toFixed(2)}</p><p className="text-sm text-white/50">Referral available ${referral?.available.toFixed(2) || "0.00"}</p></article>
           </section>
-        ) : (
           <section className="card mt-4 p-6">
-            <h2 className="font-display text-2xl font-bold">Finish the remaining missions</h2>
-            <Link href="/missions" className="btn-lime mt-4">Open missions</Link>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="font-display text-2xl font-bold">Referral</h2>
+                <p className="mt-1 break-all text-sm text-white/60">{referral?.link || "Loading link..."}</p>
+              </div>
+              <div className="flex gap-2">
+                <button className="btn-ghost" onClick={copy}>Copy Referral Link</button>
+                <a className="btn-lime" href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`Join VeyroHood Claim ${referral?.link || ""}`)}`} target="_blank" rel="noreferrer">Share on X</a>
+              </div>
+            </div>
+            {note ? <p className="mt-3 text-sm text-lime">{note}</p> : null}
           </section>
-        )}
+          <section className="mt-4 grid gap-4 md:grid-cols-3">
+            <Link href="/missions" className="card p-5">Missions <span className="block text-sm text-white/50">Open the five tasks</span></Link>
+            <Link href="/scratch" className="card p-5">{ready ? "Scratch unlocked" : "Scratch locked"}<span className="block text-sm text-white/50">{me.progress.completed}/{me.progress.total} complete</span></Link>
+            <Link href="/withdraw" className="card p-5">Withdraw <span className="block text-sm text-white/50">KYC {me.kyc.status}</span></Link>
+          </section>
+        </div>
       </main>
     </>
   );
