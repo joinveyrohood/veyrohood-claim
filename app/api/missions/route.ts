@@ -11,28 +11,29 @@ import { z } from "zod";
 export const dynamic = "force-dynamic";
 
 const copy: Record<string, { title: string; description: string; button: string }> = {
-  follow_x: { title: "Follow @VeyroHood", description: "Open the official X account. This is not checked with a paid X API.", button: "Follow" },
-  like_pinned: { title: "Like our pinned X post", description: "Open the pinned post and like it. This is an action task, not an X API check.", button: "Like Post" },
-  repost_pinned: { title: "Repost our pinned X post", description: "Open the pinned post and repost it. This is an action task, not an X API check.", button: "Repost" },
-  reply_pinned: { title: "Reply to our pinned X post", description: "Open the pinned post and reply. This is an action task, not an X API check.", button: "Reply" },
-  join_discord: { title: "Join VeyroHood Discord", description: "Open the invite, then connect Discord. Successful OAuth completes this mission. Membership is not checked.", button: "Join Discord" }
+  follow_x: { title: "Follow @VeyroHood", description: "Open the official X account. This is not checked with a paid X API.", button: "FOLLOW" },
+  like_pinned: { title: "Like the pinned post", description: "Open the official pinned post and like it. This is an action task, not an X API check.", button: "LIKE" },
+  repost_pinned: { title: "Repost the pinned post", description: "Open the official pinned post and repost it. This is an action task, not an X API check.", button: "REPOST" },
+  reply_pinned: { title: "Reply to the pinned post", description: "Open the official pinned post and reply. This is an action task, not an X API check.", button: "REPLY" },
+  join_discord: { title: "Join VeyroHood Discord", description: "Open the invite, then connect Discord. Successful OAuth completes this mission. Membership is not checked.", button: "JOIN DISCORD" }
 };
 
 export async function GET() {
   const auth = await requireUser();
   if (auth.error) return auth.error;
   const progress = await missionProgress(auth.session!.sub);
+  const pinned = pinnedPostUrl();
   return NextResponse.json({
     completed: progress.completed,
     total: progress.total,
-    pinnedPostUrl: pinnedPostUrl(),
+    pinnedPostUrl: pinned,
     discordInvite: discordInviteUrl(),
     missions: progress.cards.map((card) => ({
       ...card,
       title: copy[card.code]?.title || card.title,
       description: copy[card.code]?.description || card.description,
-      button: copy[card.code]?.button || "Open",
-      target_url: missionTarget(card.code)
+      button: copy[card.code]?.button || "OPEN",
+      target_url: missionTarget(card.code) || pinned
     }))
   });
 }
@@ -56,7 +57,6 @@ export async function POST(request: Request) {
   if (existing?.status === "COMPLETED") return NextResponse.json({ status: "COMPLETED" });
   if (parsed.data.action === "confirm") {
     if (!(ACTION_MISSIONS as readonly string[]).includes(parsed.data.code)) return jsonError("Discord completes through OAuth.");
-    if (parsed.data.code !== "follow_x" && !pinnedPostUrl()) return jsonError("Pinned post URL is not configured.", 409);
     await db.from("user_missions").upsert({ user_id: auth.session!.sub, mission_id: mission.id, status: "COMPLETED", last_error: null, verified_at: new Date().toISOString(), updated_at: new Date().toISOString() }, { onConflict: "user_id,mission_id" });
     return NextResponse.json({ status: "COMPLETED", note: "Marked done. Not verified by the X API." });
   }

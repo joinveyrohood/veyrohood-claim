@@ -3,6 +3,7 @@ export type RewardAmount = (typeof REWARD_AMOUNTS)[number];
 export const NETWORKS = ["Ethereum", "Base", "Arbitrum", "BNB Chain", "Polygon"] as const;
 export const MISSION_CODES = ["follow_x", "like_pinned", "repost_pinned", "reply_pinned", "join_discord"] as const;
 export const ACTION_MISSIONS = ["follow_x", "like_pinned", "repost_pinned", "reply_pinned"] as const;
+export const DEFAULT_PINNED_POST_URL = "https://x.com/VeyroHood/status/2107710568186753330";
 
 export function appUrl() {
   return (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(/\/$/, "");
@@ -11,7 +12,7 @@ export function officialUsername() {
   return (process.env.X_OFFICIAL_USERNAME || "VeyroHood").trim().replace(/^@/, "");
 }
 export function pinnedPostUrl() {
-  return (process.env.X_PINNED_POST_URL || "").trim();
+  return (process.env.X_PINNED_POST_URL || DEFAULT_PINNED_POST_URL).trim();
 }
 export function discordInviteUrl() {
   return process.env.DISCORD_INVITE_URL || "https://discord.gg/ZKWGaxafe";
