@@ -3,6 +3,7 @@ import { officialUsername } from "@/lib/config";
 import { appBearerToken, refreshXToken, userByUsernamePath, xErrorText, xGet, X_SCOPES } from "@/lib/x";
 import { rateLimit } from "@/lib/rate-limit";
 import { supabaseAdmin } from "@/lib/supabase";
+import { requireAdmin } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,8 @@ function safeBody(data: unknown) {
 }
 
 export async function GET(request: Request) {
+  const auth = await requireAdmin();
+  if (auth.error) return auth.error;
   const ip = request.headers.get("x-forwarded-for") || "local";
   const limited = rateLimit(`x-diagnose:${ip}`, 6, 60_000);
   if (!limited.ok) return NextResponse.json({ error: "Too many diagnose requests." }, { status: 429 });
