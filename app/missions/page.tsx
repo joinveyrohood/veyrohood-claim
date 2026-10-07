@@ -15,6 +15,7 @@ type Mission = {
 export default function MissionsPage() {
   const [missions, setMissions] = useState<Mission[]>([]);
   const [completed, setCompleted] = useState(0);
+  const [total, setTotal] = useState(0);
   const [username, setUsername] = useState("");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState("");
@@ -31,6 +32,10 @@ export default function MissionsPage() {
     const data = await res.json();
     setMissions(data.missions || []);
     setCompleted(data.completed || 0);
+    setTotal(data.total || 0);
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("discord") === "connected") setNote("Discord connected. Mission completed.");
+    if (params.get("error")) setNote(params.get("error") || "");
   }
 
   useEffect(() => {
@@ -40,10 +45,11 @@ export default function MissionsPage() {
   async function act(code: string, action: "start" | "verify", url?: string) {
     setBusy(`${code}:${action}`);
     setNote("");
-    if (action === "start" && url) window.open(url, "_blank", "noopener,noreferrer");
     if (action === "start" && code === "join_discord") {
-      window.open("/api/auth/discord/start", "_blank", "noopener,noreferrer");
+      window.location.href = "/api/auth/discord/start";
+      return;
     }
+    if (action === "start" && url) window.open(url, "_blank", "noopener,noreferrer");
     const res = await fetch("/api/missions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -51,7 +57,7 @@ export default function MissionsPage() {
     });
     const data = await res.json();
     if (data.error) setNote(data.error);
-    if (data.status === "COMPLETED") setNote("Mission verified.");
+    if (data.status === "COMPLETED") setNote("Mission completed.");
     setBusy("");
     await load();
   }
@@ -60,8 +66,8 @@ export default function MissionsPage() {
     <>
       <Nav username={username} />
       <main className="mx-auto max-w-6xl px-4 py-8">
-        <h1 className="font-display text-4xl font-extrabold">Missions {completed}/4</h1>
-        <p className="mt-2 max-w-2xl text-white/60">Opening a link does not complete a mission. Verification runs on the server. Like and repost stay locked until X_PINNED_POST_URL is set.</p>
+        <h1 className="font-display text-4xl font-extrabold">Missions {completed}/{total}</h1>
+        <p className="mt-2 max-w-2xl text-white/60">X login completes the X mission. Discord OAuth completes the Discord mission. Opening the invite alone does not.</p>
         {note ? <p className="mt-4 rounded-2xl border border-electric/40 bg-electric/10 p-3 text-sm">{note}</p> : null}
         <div className="mt-6 grid gap-4 md:grid-cols-2">
           {missions.map((mission) => (
@@ -72,16 +78,15 @@ export default function MissionsPage() {
               </div>
               <p className="mt-2 text-sm text-white/60">{mission.description}</p>
               {mission.last_error ? <p className="mt-3 text-sm text-red-200">{mission.last_error}</p> : null}
-              {!mission.target_url && mission.code !== "join_discord" ? (
-                <p className="mt-3 text-sm text-amber-200">Pinned post URL is not available yet.</p>
-              ) : null}
               <div className="mt-5 flex flex-wrap gap-2">
-                <button className="btn-ghost" disabled={mission.status === "COMPLETED" || busy === `${mission.code}:start` || (!mission.target_url && mission.code !== "join_discord")} onClick={() => act(mission.code, "start", mission.target_url)}>
-                  {busy === `${mission.code}:start` ? "Opening..." : "Complete Mission"}
+                <button className="btn-ghost" disabled={mission.status === "COMPLETED" || busy === `${mission.code}:start`} onClick={() => act(mission.code, "start", mission.target_url)}>
+                  {busy === `${mission.code}:start` ? "Opening..." : mission.code === "join_discord" ? "Connect Discord" : "Open"}
                 </button>
-                <button className="btn-lime" disabled={mission.status === "COMPLETED" || busy === `${mission.code}:verify`} onClick={() => act(mission.code, "verify")}>
-                  {busy === `${mission.code}:verify` ? "Verifying..." : "Verify"}
-                </button>
+                {mission.code !== "join_discord" ? (
+                  <button className="btn-lime" disabled={mission.status === "COMPLETED" || busy === `${mission.code}:verify`} onClick={() => act(mission.code, "verify")}>
+                    {busy === `${mission.code}:verify` ? "Checking..." : "Verify"}
+                  </button>
+                ) : null}
               </div>
             </article>
           ))}

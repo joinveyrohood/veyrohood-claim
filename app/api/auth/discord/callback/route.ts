@@ -32,12 +32,29 @@ export async function GET(request: Request) {
     headers: { Authorization: `Bearer ${token.access_token}` }
   });
   const me = await meRes.json();
-  if (!meRes.ok) return fail("Could not read Discord profile.");
+  if (!meRes.ok || !me.id) return fail("Could not read Discord profile.");
 
-  await supabaseAdmin()
+  const db = supabaseAdmin();
+  const { error: saveError } = await db
     .from("users")
     .update({ discord_user_id: me.id, discord_username: me.username, updated_at: new Date().toISOString() })
     .eq("id", session.sub);
+  if (saveError) return fail("Could not save Discord account.");
+
+  const { data: mission } = await db.from("missions").select("id").eq("code", "join_discord").maybeSingle();
+  if (mission?.id) {
+    await db.from("user_missions").upsert(
+      {
+        user_id: session.sub,
+        mission_id: mission.id,
+        status: "COMPLETED",
+        last_error: null,
+        verified_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      },
+      { onConflict: "user_id,mission_id" }
+    );
+  }
 
   return NextResponse.redirect(`${appUrl()}/missions?discord=connected`);
 }

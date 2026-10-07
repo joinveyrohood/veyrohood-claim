@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Nav } from "@/components/Nav";
 
 type Me = {
-  user: { x_username: string; display_name: string; avatar_url?: string; created_at: string };
+  user: { x_username: string; display_name: string; avatar_url?: string; created_at: string; discord_user_id?: string | null };
   progress: { completed: number; total: number };
   balance: { available: number; reward: number; revealed: boolean };
   kyc: { status: string };
@@ -36,7 +36,7 @@ export default function DashboardPage() {
     return <main className="p-8 text-white/60">{error || "Loading account..."}</main>;
   }
 
-  const ready = me.progress.completed >= 4;
+  const ready = me.progress.total > 0 && me.progress.completed >= me.progress.total;
   return (
     <>
       <Nav username={me.user.x_username} />
@@ -45,7 +45,7 @@ export default function DashboardPage() {
           {me.user.avatar_url ? <img src={me.user.avatar_url} alt="" className="h-16 w-16 rounded-2xl" /> : null}
           <div>
             <h1 className="font-display text-3xl font-extrabold">{me.user.display_name}</h1>
-            <p className="text-white/60">@{me.user.x_username} · Account active</p>
+            <p className="text-white/60">@{me.user.x_username} · Account active{me.user.discord_user_id ? " · Discord connected" : ""}</p>
           </div>
           <div className="md:ml-auto">
             <p className="text-sm text-white/50">Mission progress</p>
@@ -74,7 +74,7 @@ export default function DashboardPage() {
           </section>
         ) : (
           <section className="card mt-4 p-6">
-            <h2 className="font-display text-2xl font-bold">Finish the 4 missions</h2>
+            <h2 className="font-display text-2xl font-bold">Finish the remaining missions</h2>
             <Link href="/missions" className="btn-lime mt-4">Open missions</Link>
           </section>
         )}

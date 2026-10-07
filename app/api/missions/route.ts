@@ -18,10 +18,14 @@ export async function GET() {
     total: progress.total,
     missions: progress.cards.map((card) => ({
       ...card,
+      title: card.code === "join_discord" ? "Connect Discord" : card.title,
+      description: card.code === "join_discord"
+        ? "Connect Discord with OAuth. A successful login saves your Discord id and completes this mission. Server membership is not checked."
+        : card.description,
       target_url: missionTarget(card.code, card.target_url)
     })),
     pinnedConfigured: Boolean(process.env.X_PINNED_POST_URL),
-    discordConfigured: Boolean(process.env.DISCORD_BOT_TOKEN && process.env.DISCORD_GUILD_ID)
+    discordConfigured: Boolean(process.env.DISCORD_CLIENT_ID && process.env.DISCORD_CLIENT_SECRET)
   });
 }
 
@@ -84,7 +88,7 @@ export async function POST(request: Request) {
       .from("user_missions")
       .update({
         status,
-        last_error: passed ? null : "Verification did not find this action yet.",
+        last_error: passed ? null : "Connect Discord to complete this mission.",
         verified_at: passed ? new Date().toISOString() : null,
         updated_at: new Date().toISOString()
       })
@@ -92,7 +96,7 @@ export async function POST(request: Request) {
       .eq("mission_id", mission.id);
     return NextResponse.json({
       status,
-      error: passed ? null : "Not verified yet. Finish the action, wait a moment, then verify again."
+      error: passed ? null : "Connect Discord to complete this mission."
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Verification failed.";
