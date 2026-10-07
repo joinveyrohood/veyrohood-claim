@@ -7,6 +7,10 @@ import { rateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
+function unlocked(progress: { completed: number; total: number }) {
+  return progress.total > 0 && progress.completed >= progress.total;
+}
+
 export async function GET() {
   const auth = await requireUser();
   if (auth.error) return auth.error;
@@ -18,7 +22,7 @@ export async function GET() {
     .maybeSingle();
   const progress = await missionProgress(auth.session!.sub);
   return NextResponse.json({
-    unlocked: progress.completed >= 4 && progress.total >= 4,
+    unlocked: unlocked(progress),
     reward: data
       ? {
           amount: data.revealed ? Number(data.amount) : null,
@@ -38,7 +42,7 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   const action = body.action === "reveal" ? "reveal" : "generate";
   const progress = await missionProgress(auth.session!.sub);
-  if (progress.completed < 4) return jsonError("Complete all 4 verified missions first.", 403);
+  if (!unlocked(progress)) return jsonError("Complete the remaining zero-cost missions first.", 403);
 
   const db = supabaseAdmin();
   const { data: existing } = await db

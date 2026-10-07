@@ -1,5 +1,7 @@
 import { supabaseAdmin } from "./supabase";
 
+const DISABLED_PAID_MISSIONS = new Set(["like_pinned", "repost_pinned"]);
+
 export async function availableBalance(userId: string) {
   const db = supabaseAdmin();
   const { data: reward } = await db
@@ -42,15 +44,17 @@ export async function missionProgress(userId: string) {
     .eq("user_id", userId);
 
   const byMission = new Map((states || []).map((row) => [row.mission_id, row]));
-  const cards = (missions || []).map((mission) => {
-    const state = byMission.get(mission.id);
-    return {
-      ...mission,
-      status: state?.status || "NOT_STARTED",
-      last_error: state?.last_error || null,
-      verified_at: state?.verified_at || null
-    };
-  });
+  const cards = (missions || [])
+    .filter((mission) => !DISABLED_PAID_MISSIONS.has(mission.code))
+    .map((mission) => {
+      const state = byMission.get(mission.id);
+      return {
+        ...mission,
+        status: state?.status || "NOT_STARTED",
+        last_error: state?.last_error || null,
+        verified_at: state?.verified_at || null
+      };
+    });
   const completed = cards.filter((card) => card.status === "COMPLETED").length;
   return { cards, completed, total: cards.length };
 }
